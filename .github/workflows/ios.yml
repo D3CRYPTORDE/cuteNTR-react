@@ -3,7 +3,7 @@ name: iOS Unsigned Build
 on:
   push:
     branches: [ main, master ]
-  pull_request:
+  pull_request: 
     branches: [ main, master ]
 
 jobs:
@@ -23,39 +23,35 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install
-          # Wir bleiben bei der aktuellen Version, fixen aber das Podfile
+          # Wir nutzen die stabile Version
           npm install ffmpeg-kit-react-native@6.0.2 --save --legacy-peer-deps
 
-      - name: Advanced Podfile Patch
+      - name: Surgical Podfile Patch
         run: |
           cd ios
           rm -f Podfile.lock
           
-          # 1. Deployment Target auf 13.0
+          # 1. Deployment Target im gesamten File auf 13.0 setzen
           sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" Podfile
           sed -i '' "s/platform :ios, '12.0'/platform :ios, '13.0'/g" Podfile
           sed -i '' "s/platform :ios, '12.4'/platform :ios, '13.0'/g" Podfile
 
-          # 2. Den FFmpeg-Download-Link im Podfile "umbiegen" oder erzwingen
-          # Wir nutzen ein alternatives Subspec, falls das Standard-Subspec 404 wirft
-          # Dieser Block wird ans Ende des Podfiles angehängt
-          cat <<EOF >> Podfile
+          # 2. Bestehende post_install Blöcke finden und modifizieren
+          # Wir fügen die Target-Einstellung direkt nach dem post_install-Aufruf ein
+          sed -i '' "/post_install do |installer|/a\\
+            installer.pods_project.targets.each do |target|\\
+              target.build_configurations.each do |config|\\
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'\\
+              end\\
+            end" Podfile
 
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-              end
-            end
-          end
-          EOF
-
+          # 3. Fallback auf 'min' Paket, falls das Standard-Paket (https) 404 wirft
           pod repo update
-          # Falls der Standard-Install fehlschlägt, nutzen wir 'min'-Version von ffmpeg (leichter & oft stabiler)
           pod install --repo-update || (sed -i '' "s/ffmpeg-kit-react-native\/https/ffmpeg-kit-react-native\/min/g" Podfile && pod install)
 
       - name: Build Xcode Archive (Unsigned)
         run: |
+          # Achte darauf, dass 'cuteNTR' der Name deines Targets ist (laut Log ist es das)
           xcodebuild -workspace ios/cuteNTR.xcworkspace \
                      -scheme cuteNTR \
                      -configuration Release \
