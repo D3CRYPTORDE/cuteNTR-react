@@ -3,16 +3,12 @@ name: iOS Unsigned Build
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
 
 jobs:
   build-ios:
     runs-on: macos-latest
-    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -23,32 +19,13 @@ jobs:
       - name: Install Dependencies
         run: |
           npm install
-          # Wir erzwingen die Version, die mit dem 'min' Paket kompatibel ist
+          # Sicherstellen, dass das npm-Modul zur Pod-Version passt
           npm install ffmpeg-kit-react-native@6.0.2 --save --legacy-peer-deps
-
-      - name: Patch Existing Podfile
-        run: |
-          cd ios
-          # 1. FFmpeg-Kit auf 'min' umstellen, um den 404-Download-Fehler zu umgehen
-          # Wir fügen das Pod direkt vor use_react_native ein
-          sed -i '' "/use_react_native!/i\\
-            pod 'ffmpeg-kit-ios-min', '6.0'
-          " Podfile
-
-          # 2. Den post_install Block erweitern
-          # Da dein Podfile bereits einen react_native_post_install Aufruf hat, 
-          # fügen wir unsere Target-Fixes direkt danach ein.
-          sed -i '' "/react_native_post_install(/a\\
-              installer.pods_project.targets.each do |target|\\
-                target.build_configurations.each do |config|\\
-                  config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'\\
-                end\\
-              end" Podfile
 
       - name: Install Pods
         run: |
           cd ios
-          rm -f Podfile.lock
+          rm -rf Podfile.lock
           pod repo update
           pod install --repo-update
 
@@ -65,14 +42,13 @@ jobs:
                      AD_HOC_CODE_SIGNING_ALLOWED=YES \
                      clean archive
 
-      - name: Export .ipa (Manual Payload)
+      - name: Export .ipa
         run: |
           mkdir -p payload/Payload
           cp -r build/cuteNTR.xcarchive/Products/Applications/*.app payload/Payload/
-          cd payload
-          zip -r ../cuteNTR-unsigned.ipa Payload
+          cd payload && zip -r ../cuteNTR-unsigned.ipa Payload
           
-      - name: Upload IPA Artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-unsigned-ipa
