@@ -5,13 +5,15 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-
 platform :ios, '15.0'
 
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
 target 'cuteNTR' do
   config = use_native_modules!
+
+  # FIX: Wir erzwingen das 'min' Paket von FFmpeg, da das 'https' Paket oft 404 Fehler wirft
+  pod 'ffmpeg-kit-ios-min', '6.0'
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -21,15 +23,21 @@ target 'cuteNTR' do
 
   target 'cuteNTRTests' do
     inherit! :complete
-    # Pods for testing
   end
 
   post_install do |installer|
+    # Standard React Native post_install
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false,
-      # :ccache_enabled => true
+      :mac_catalyst_enabled => false
     )
+
+    # FIX: Alle Pod-Targets auf iOS 15.0 zwingen, um Build-Fehler zu vermeiden
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      end
+    end
   end
 end
