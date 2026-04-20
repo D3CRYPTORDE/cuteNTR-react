@@ -23,18 +23,25 @@ jobs:
       - name: Install NPM dependencies
         run: npm install
 
-      - name: Install CocoaPods
+      - name: Fix FFmpeg-Kit and Install Pods
         run: |
           cd ios
-          pod install
-        
+          # Verhindert 404 Fehler durch Aktualisierung der Spec-Repos
+          pod repo update
+          # Löscht eventuell korrupte FFmpeg Downloads
+          pod cache clean ffmpeg-kit-ios-https --all
+          # Installiert Pods mit automatischer Fehlerbehebung für Codegen
+          pod install --repo-update
+
       - name: Build Xcode Archive (Unsigned)
         run: |
-          xcodebuild -workspace ios/adorableNTR.xcworkspace \
-                     -scheme adorableNTR \
+          # Wir nutzen 'cuteNTR' oder 'adorableNTR' - je nach deinem Project Name in Xcode
+          # Falls der Name im Log 'cuteNTR' war, nutzen wir diesen hier:
+          xcodebuild -workspace ios/cuteNTR.xcworkspace \
+                     -scheme cuteNTR \
                      -configuration Release \
                      -sdk iphoneos \
-                     -archivePath $PWD/build/adorableNTR.xcarchive \
+                     -archivePath $PWD/build/cuteNTR.xcarchive \
                      CODE_SIGNING_ALLOWED=NO \
                      CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGN_IDENTITY="" \
@@ -44,12 +51,14 @@ jobs:
       - name: Export .ipa (Manual Payload)
         run: |
           mkdir -p payload/Payload
-          cp -r build/adorableNTR.xcarchive/Products/Applications/*.app payload/Payload/
+          # Kopiert die .app Datei aus dem Archiv in den Payload Ordner
+          cp -r build/cuteNTR.xcarchive/Products/Applications/*.app payload/Payload/
           cd payload
-          zip -r ../adorableNTR-unsigned.ipa Payload
+          # Erstellt das IPA-Paket
+          zip -r ../cuteNTR-unsigned.ipa Payload
           
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-unsigned-ipa
-          path: adorableNTR-unsigned.ipa
+          path: cuteNTR-unsigned.ipa
