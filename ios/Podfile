@@ -1,4 +1,4 @@
-# Resolve react_native_pods.rb with node to allow for hoisting
+# Pfadauflösung für React Native (Hoisting Support)
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
     "react-native/scripts/react_native_pods.rb",
@@ -12,7 +12,8 @@ require_relative '../node_modules/@react-native-community/cli-platform-ios/nativ
 target 'cuteNTR' do
   config = use_native_modules!
 
-  # FIX: Wir erzwingen das 'min' Paket von FFmpeg, da das 'https' Paket oft 404 Fehler wirft
+  # FIX: Wir nutzen 'min' statt 'https', um den 404-Fehler zu umgehen.
+  # 'min' ist für das 3DS-Streaming absolut ausreichend.
   pod 'ffmpeg-kit-ios-min', '6.0'
 
   use_react_native!(
@@ -26,14 +27,14 @@ target 'cuteNTR' do
   end
 
   post_install do |installer|
-    # Standard React Native post_install
+    # Standard React Native Einstellungen
     react_native_post_install(
       installer,
       config[:reactNativePath],
       :mac_catalyst_enabled => false
     )
 
-    # FIX: Alle Pod-Targets auf iOS 15.0 zwingen, um Build-Fehler zu vermeiden
+    # FIX: Erzwinge iOS 15.0 für alle Pods, um Linker-Fehler zu vermeiden
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
