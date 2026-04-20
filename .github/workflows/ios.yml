@@ -20,22 +20,29 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install NPM dependencies
-        run: npm install
+      - name: Install Dependencies with Fixed FFmpeg
+        run: |
+          npm install
+          # Wir zwingen das NPM Paket auf 5.1.0, damit das native Pod nicht 6.0 verlangt
+          npm install ffmpeg-kit-react-native@5.1.0 --save
 
-      - name: Patch Podfile and Install Pods
+      - name: Force Clean and Patch Pods
         run: |
           cd ios
-          # Wir erzwingen Version 5.1, da 6.0 einen 404-Fehler verursacht
-          # Dies fügt die Zeile oben in das Podfile ein
-          sed -i '' "1i\\
-          pod 'ffmpeg-kit-ios-https', '5.1'
-          " Podfile
+          # 1. Entferne die Lock-Datei komplett
+          rm -rf Podfile.lock
           
+          # 2. Setze iOS Deployment Target auf 13.0 (wichtig für FFmpeg 5.1)
+          sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" Podfile
+          sed -i '' "s/platform :ios, '12.0'/platform :ios, '13.0'/g" Podfile
+          sed -i '' "s/platform :ios, '12.4'/platform :ios, '13.0'/g" Podfile
+
+          # 3. Wir patchen das Podfile NICHT mehr manuell mit 'pod 5.1', 
+          # da das NPM Paket 5.1.0 das jetzt automatisch richtig anfordert.
+          
+          # 4. Installation
           pod repo update
-          pod cache clean ffmpeg-kit-ios-https --all
-          # Falls 'pod install' fehlschlägt, versuchen wir es mit einem Workaround für die Codegen
-          pod install --repo-update || pod install --repo-update
+          pod install --repo-update
 
       - name: Build Xcode Archive (Unsigned)
         run: |
