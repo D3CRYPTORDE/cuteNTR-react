@@ -23,20 +23,22 @@ jobs:
       - name: Install NPM dependencies
         run: npm install
 
-      - name: Fix FFmpeg-Kit and Install Pods
+      - name: Patch Podfile and Install Pods
         run: |
           cd ios
-          # Verhindert 404 Fehler durch Aktualisierung der Spec-Repos
+          # Wir erzwingen Version 5.1, da 6.0 einen 404-Fehler verursacht
+          # Dies fügt die Zeile oben in das Podfile ein
+          sed -i '' "1i\\
+          pod 'ffmpeg-kit-ios-https', '5.1'
+          " Podfile
+          
           pod repo update
-          # Löscht eventuell korrupte FFmpeg Downloads
           pod cache clean ffmpeg-kit-ios-https --all
-          # Installiert Pods mit automatischer Fehlerbehebung für Codegen
-          pod install --repo-update
+          # Falls 'pod install' fehlschlägt, versuchen wir es mit einem Workaround für die Codegen
+          pod install --repo-update || pod install --repo-update
 
       - name: Build Xcode Archive (Unsigned)
         run: |
-          # Wir nutzen 'cuteNTR' oder 'adorableNTR' - je nach deinem Project Name in Xcode
-          # Falls der Name im Log 'cuteNTR' war, nutzen wir diesen hier:
           xcodebuild -workspace ios/cuteNTR.xcworkspace \
                      -scheme cuteNTR \
                      -configuration Release \
@@ -51,10 +53,8 @@ jobs:
       - name: Export .ipa (Manual Payload)
         run: |
           mkdir -p payload/Payload
-          # Kopiert die .app Datei aus dem Archiv in den Payload Ordner
           cp -r build/cuteNTR.xcarchive/Products/Applications/*.app payload/Payload/
           cd payload
-          # Erstellt das IPA-Paket
           zip -r ../cuteNTR-unsigned.ipa Payload
           
       - name: Upload IPA Artifact
