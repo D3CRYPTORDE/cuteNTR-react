@@ -1,0 +1,55 @@
+name: iOS Unsigned Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install NPM dependencies
+        run: npm install
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+        
+      - name: Build Xcode Archive (Unsigned)
+        run: |
+          xcodebuild -workspace ios/adorableNTR.xcworkspace \
+                     -scheme adorableNTR \
+                     -configuration Release \
+                     -sdk iphoneos \
+                     -archivePath $PWD/build/adorableNTR.xcarchive \
+                     CODE_SIGNING_ALLOWED=NO \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGN_IDENTITY="" \
+                     AD_HOC_CODE_SIGNING_ALLOWED=YES \
+                     clean archive
+
+      - name: Export .ipa (Manual Payload)
+        run: |
+          mkdir -p payload/Payload
+          cp -r build/adorableNTR.xcarchive/Products/Applications/*.app payload/Payload/
+          cd payload
+          zip -r ../adorableNTR-unsigned.ipa Payload
+          
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: adorableNTR-unsigned.ipa
