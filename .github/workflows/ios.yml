@@ -20,29 +20,39 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install Dependencies with Fixed FFmpeg
+      - name: Install Dependencies
         run: |
           npm install
-          # Wir zwingen das NPM Paket auf 5.1.0, damit das native Pod nicht 6.0 verlangt
-          npm install ffmpeg-kit-react-native@5.1.0 --save
+          # Wir bleiben bei der aktuellen Version, fixen aber das Podfile
+          npm install ffmpeg-kit-react-native@6.0.2 --save --legacy-peer-deps
 
-      - name: Force Clean and Patch Pods
+      - name: Advanced Podfile Patch
         run: |
           cd ios
-          # 1. Entferne die Lock-Datei komplett
-          rm -rf Podfile.lock
+          rm -f Podfile.lock
           
-          # 2. Setze iOS Deployment Target auf 13.0 (wichtig für FFmpeg 5.1)
+          # 1. Deployment Target auf 13.0
           sed -i '' "s/platform :ios, '11.0'/platform :ios, '13.0'/g" Podfile
           sed -i '' "s/platform :ios, '12.0'/platform :ios, '13.0'/g" Podfile
           sed -i '' "s/platform :ios, '12.4'/platform :ios, '13.0'/g" Podfile
 
-          # 3. Wir patchen das Podfile NICHT mehr manuell mit 'pod 5.1', 
-          # da das NPM Paket 5.1.0 das jetzt automatisch richtig anfordert.
-          
-          # 4. Installation
+          # 2. Den FFmpeg-Download-Link im Podfile "umbiegen" oder erzwingen
+          # Wir nutzen ein alternatives Subspec, falls das Standard-Subspec 404 wirft
+          # Dieser Block wird ans Ende des Podfiles angehängt
+          cat <<EOF >> Podfile
+
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+              end
+            end
+          end
+          EOF
+
           pod repo update
-          pod install --repo-update
+          # Falls der Standard-Install fehlschlägt, nutzen wir 'min'-Version von ffmpeg (leichter & oft stabiler)
+          pod install --repo-update || (sed -i '' "s/ffmpeg-kit-react-native\/https/ffmpeg-kit-react-native\/min/g" Podfile && pod install)
 
       - name: Build Xcode Archive (Unsigned)
         run: |
